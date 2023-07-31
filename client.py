@@ -20,19 +20,28 @@ client = discord.Client(intents=intents)
 
 clientInitiated = False
 token = config.get("Discord", "token")
+
 feed_channel_id = int(config.get("Discord", "feed_channel_id"))
 release_channel_id = int(config.get("Discord", "release_channel_id"))
+status_channel_id = int(config.get("Discord", "status_channel_id"))
+
+blacklist = set(config.get("Toy", "blacklist").split(","))
+flops_allowed = config.get("Toy", "flops_allowed")
 
 # Variable to store the last fetched toys
 last_toys = []
 
 @client.event
 async def on_ready():
-    global last_toys  # Access the global variable within the function
+    global blacklist
+    global flops_allowed
+    global last_toys
+
     channel = client.get_channel(feed_channel_id)
     release_channel = client.get_channel(release_channel_id)
+    status_channel = client.get_channel(status_channel_id)
 
-    await channel.send("**I am awake once again**, *I will continue monitoring! <3*")
+    await status_channel.send("**I am awake once again**, *I will continue monitoring! <3*")
     clientInitiated = True
     print('Client ready!')
 
@@ -48,9 +57,9 @@ async def on_ready():
         toys = getToys(toy_types)
         print("Toys fetched:")
         print(tabulate(toys, headers="firstrow"))  # Print the fetched toys as a table
-        print()
 
         if channel and toys != last_toys:
+            await channel.purge()
             print("Toys are different. Sending updates...")
             for toy in toys:
                 # Create an embed message
@@ -110,7 +119,10 @@ async def on_ready():
                     await release_channel.send(embed=embed2)
                 
                 # Send the embed message
-                await channel.send(embed=embed)
+                if not toy[2] in blacklist:
+                    if flops_allowed and toy[5]:
+                        print("Flops aren't allowed, ignored.")
+                    await channel.send(embed=embed)
 
             await channel.send("**These were all the toys I found this time**, *thanks for checking in! <3*")
         else:
